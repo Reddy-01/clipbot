@@ -1,0 +1,17 @@
+{
+  "name": "ClipBot",
+  "build": {
+    "dockerfile": "cloud/Dockerfile",
+    "context": "."
+  },
+  "overrideCommand": true,
+  "forwardPorts": [
+    8765
+  ],
+  "portsAttributes": {
+    "8765": {
+      "label": "ClipBot"
+    }
+  },
+  "postStartCommand": "bash -c 'export CLIPBOT_PUBLIC_ORIGIN=\"https://${CODESPACE_NAME}-8765.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}\" CLIPBOT_HOME=\"$PWD/.clipbot-data\"; mkdir -p \"$CLIPBOT_HOME\"; grep -qxF /.clipbot-data/ .git/info/exclude || echo /.clipbot-data/ >> .git/info/exclude; nohup python clipbot.py serve --bind 0.0.0.0 > \"$CLIPBOT_HOME/server.log\" 2>&1 < /dev/null &'"
+}
