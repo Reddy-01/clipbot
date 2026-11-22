@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f6f2"><title>ClipBot — Video Workspace</title>
+<style>
+:root {
+  color-scheme:light;
+  --canvas:#f5f6f2; --surface:#fff; --ink:#1b2420; --muted:#53625a;
+  --line:#dde3dd; --accent:#14624b; --accent-hover:#0d4b38; --tint:#eaf3ec;
+  --rail:#182822; --rail-muted:#b6c9be; --good:#14624b; --warn:#79550c; --bad:#a22f38;
+  font:15px/1.5 "Segoe UI",system-ui,sans-serif;
+}
+* { box-sizing:border-box }
+[hidden],.hidden { display:none !important }
+body { margin:0; background:var(--canvas); color:var(--ink) }
+h1,h2,h3,p,dl,dd { margin:0 }
+h1 { font-size:clamp(1.75rem,3vw,2.5rem); letter-spacing:-.05em; line-height:1.15; font-weight:720 }
+h2 { font-size:1.13rem; letter-spacing:-.02em; margin-bottom:14px }
+h3 { font-size:.93rem }
+p,.hint,.muted,.side-note { color:var(--muted) }
+.hint,.side-note { font-size:.83rem; line-height:1.55 }
+.tiny { font-size:.76rem }
+button,input,textarea,select { font:inherit }
+button,summary { cursor:pointer }
+button:disabled { opacity:.55; cursor:not-allowed }
+a { color:var(--accent) }
+:focus-visible { outline:2px solid #2d8b6d; outline-offset:3px }
+.shell { display:grid; grid-template-columns:220px minmax(0,1fr); min-height:100vh }
+.rail { position:sticky; top:0; height:100vh; background:var(--rail); color:#fbfdf9; padding:24px 16px; display:flex; flex-direction:column; gap:35px }
+.brand { display:flex; align-items:center; gap:11px; text-decoration:none; color:inherit; padding:0 7px }
+.brand strong,.brand small { display:block }
+.brand strong { font-size:1.18rem; letter-spacing:-.035em; line-height:1.25 }
+.brand small { color:var(--rail-muted); font-size:.74rem }
+.brand-icon { display:grid; place-items:center; flex:0 0 39px; height:39px; border-radius:12px; color:#193528; background:#bce7cd; font-weight:800; font-size:1.35rem }
+.nav { display:grid; gap:5px }
+.nav a { display:flex; align-items:center; gap:10px; padding:10px 11px; border-radius:8px; color:var(--rail-muted); text-decoration:none; font-size:.87rem; font-weight:650; white-space:nowrap }
+.nav a span { min-width:17px; text-align:center; font-size:.96rem }
+.nav a:hover { background:#2a3b33; color:#fff }
+.nav a[aria-current=page] { background:#d9ebdf; color:#193b2e }
+.local-pill { margin-top:auto; display:flex; align-items:center; gap:8px; padding:9px 7px; font-size:.78rem; color:var(--rail-muted) }
+.pulse { width:8px; height:8px; background:#8fdbb2; border-radius:50%; flex:none }
+.pulse.off { background:#e6978c }
+.workspace { width:100%; max-width:1480px; margin:0 auto; align-self:start; padding:32px clamp(18px,3vw,48px) 50px }
+.page-heading { margin-bottom:24px }
+.page-heading p { margin-top:8px; font-size:.93rem }
+.layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(240px,285px); align-items:start; gap:21px }
+.stack { display:grid; gap:16px; min-width:0 }
+.status-stack { position:sticky; top:20px }
+.card { background:var(--surface); border:1px solid var(--line); border-radius:13px; padding:21px; min-width:0 }
+.section-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:15px }
+.section-head h2 { margin:0 }
+.section-head p { font-size:.83rem; margin-top:4px }
+.tag { display:inline-block; border-radius:5px; padding:3px 7px; color:#41514a; background:#edf0ed; font-size:.72rem; font-weight:650; white-space:nowrap }
+.tag.good,.stage.done { color:var(--good); background:#ebf5ee }
+.tag.warn,.stage.active { color:var(--warn); background:#fcf4df }
+.tag.bad,.stage.error { color:var(--bad); background:#fcf0ef }
+.stagebar { display:flex; justify-content:space-between; gap:9px; margin:12px 0 }
+.stagebar .now { font-weight:720; line-height:1.3 }
+.stagebar .sub { color:var(--muted); font-size:.8rem; margin-top:5px; overflow-wrap:anywhere }
+.pct { font-weight:750; font-variant-numeric:tabular-nums; color:var(--accent); white-space:nowrap }
+.progress-wrap { height:7px; background:#e5eae5; border-radius:20px; overflow:hidden }
+.progress-wrap span { display:block; background:#248066; height:100%; width:0; transition:width .2s }
+.status-explainer { font-size:.75rem; color:var(--muted); margin-top:8px }
+.next-card a { font-size:.9rem; font-weight:700 }
+.next-card p { margin-top:4px }
+.export-note { margin:-7px 0 13px }
+.stat-grid { display:grid; gap:10px }
+.stat { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:.81rem; color:var(--muted) }
+.stat .num { color:var(--ink); font-weight:730; font-variant-numeric:tabular-nums }
+.stage-panel { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px }
+.stage { padding:12px; border:1px solid var(--line); border-radius:8px; background:#f6f8f5; min-width:0 }
+.stage-top { display:flex; justify-content:space-between; gap:5px; margin-bottom:5px; font-size:.73rem; font-weight:650 }
+.stage p { font-size:.77rem; margin-top:3px }
+.arrowtext { display:none }
+.primary,.secondary,.outline,.ghost { display:inline-flex; justify-content:center; align-items:center; border-radius:8px; min-height:40px; padding:8px 13px; border:1px solid transparent; text-decoration:none; font-size:.86rem; font-weight:680; line-height:1.3; text-align:center }
+.primary { background:var(--accent); color:#fff }
+.primary:hover { background:var(--accent-hover) }
+.secondary { background:var(--tint); color:#15553f }
+.secondary:hover { background:#dceee2 }
+.outline { background:#fff; border-color:#d3ded6; color:var(--ink) }
+.outline:hover,.ghost:hover { background:#f2f5f1 }
+.ghost { background:transparent; color:var(--accent) }
+.full { width:100% }
+.form-grid,.option-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px }
+.form-fields,.field { display:grid; align-content:start; gap:12px; min-width:0 }
+.field { gap:5px }
+.field label { font-size:.83rem; font-weight:650 }
+input:not([type=checkbox]), select,textarea { width:100%; min-width:0; border:1px solid #ccd7ce; border-radius:8px; background:#fcfdfb; color:var(--ink); padding:9px 10px }
+textarea { resize:vertical; min-height:80px }
+input[type=checkbox] { accent-color:var(--accent); width:16px; height:16px; flex:none }
+.check { display:flex; align-items:flex-start; gap:7px; font-size:.83rem; color:var(--muted) }
+.label-strip { padding:12px; border-radius:8px; border:1px solid var(--line); background:#f7f9f6; font-size:.82rem }
+.studio-settings { margin-top:14px; padding-top:15px; border-top:1px solid var(--line) }
+#studioPrompt { min-height:122px }
+#studioScenes { display:grid; gap:10px; margin-top:15px }
+#studioScenes fieldset { display:grid; justify-items:start; gap:7px; min-width:0; margin:0; padding:11px; border:1px solid var(--line); border-radius:9px; background:#f8faf7 }
+#studioScenes fieldset button { min-height:29px; padding:4px 8px; font-size:.76rem }
+#studioEngine:empty,#studioScenes:empty { display:none }
+.work-bottom,.chip-row,.hero-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+.work-bottom,.hero-actions,.section-end { margin-top:14px }
+.chip { padding:4px 7px; border:1px solid var(--line); border-radius:5px; color:var(--muted); font-size:.72rem }
+.results { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px }
+.library-summary { align-items:center }
+#libraryBadge { font-size:.88rem; font-weight:700 }
+.clip { border:1px solid var(--line); border-radius:10px; background:#fcfdfb; overflow:hidden; min-width:0 }
+.clip video { display:block; width:100%; height:clamp(155px,23vw,280px); object-fit:contain; background:#19251f }
+.clipinfo { padding:12px }
+.clip strong { display:block; font-size:.9rem; overflow-wrap:anywhere }
+.clip .meta { color:var(--muted); font-size:.76rem; margin-top:5px }
+.clip-actions { display:flex; flex-wrap:wrap; gap:5px; margin-top:10px }
+.clip-actions a,.clip-actions button { min-height:32px; padding:5px 7px; font-size:.72rem }
+.clip details { margin-top:10px }
+.clip details > * + * { margin-top:7px }
+.empty { border:1px dashed #cdd8cf; border-radius:9px; background:#f9fbf8; padding:23px 13px; color:var(--muted); font-size:.85rem; text-align:center }
+.empty .big { display:none }
+.empty strong { display:block; color:var(--ink); margin-bottom:4px }
+.status-row { display:flex; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--line); font-size:.81rem }
+.green { color:var(--good) }.yellow { color:var(--warn) }.red { color:var(--bad) }
+details summary { font-size:.83rem; font-weight:650; color:var(--accent) }
+details[open] summary { margin-bottom:8px }
+.logbox { margin:8px 0 0; padding:9px; max-height:185px; overflow:auto; background:#eef3ee; border-radius:7px; white-space:pre-wrap; overflow-wrap:anywhere; font:11px/1.5 ui-monospace,monospace }
+.analytics-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:12px 0 }
+.metric,.insight-advice { padding:10px; background:var(--tint); border-radius:7px }
+.metric b { display:block }
+.insight-advice { margin-top:10px; font-size:.84rem }
+.toast { position:fixed; bottom:18px; left:50%; transform:translate(-50%,120px); padding:10px 14px; border-radius:9px; background:var(--rail); color:#fff; max-width:min(94vw,580px); width:max-content; font-size:.83rem; z-index:9; pointer-events:none; opacity:0; transition:transform .2s,opacity .2s }
+.toast.show { opacity:1; transform:translate(-50%,0) }
+@media (max-width:1050px) {
+  .shell { grid-template-columns:190px minmax(0,1fr) }
+  .layout { grid-template-columns:minmax(0,1fr) 230px; gap:14px }
+  .workspace { padding-inline:18px }
+  .card { padding:16px }
+}
+@media (max-width:880px) {
+  .shell { display:block }
+  .rail { position:static; height:auto; gap:13px; padding:12px 14px }
+  .brand { padding:0 }
+  .nav { display:flex; overflow:auto; gap:5px; scrollbar-width:thin }
+  .nav a { padding:7px 9px }
+  .local-pill { position:absolute; right:14px; top:10px; padding:8px 0 }
+  .status-stack { position:static }
+}
+@media (max-width:640px) {
+  .workspace { padding:20px 12px 30px }
+  .page-heading { margin-bottom:14px }
+  .layout { grid-template-columns:minmax(0,1fr) }
+  .form-grid,.option-grid { grid-template-columns:minmax(0,1fr); gap:11px }
+  .nav { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); overflow:visible }
+  .nav a { min-height:36px; padding:5px 6px; white-space:normal; font-size:.76rem; gap:4px }
+  .nav a span { min-width:12px }
+  .results { grid-template-columns:minmax(0,1fr) }
+  .clip video { height:230px }
+  .card { padding:14px }
+}
+@media (prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none !important } }
+</style>
+</head><body>
+<div class="shell">
+  <aside class="rail">
+    <a href="#studioPanel" class="brand" aria-label="ClipBot home">
+      <span class="brand-icon" aria-hidden="true">C</span>
+      <span><strong>ClipBot</strong><small>Video workspace</small></span>
+    </a>
+    <nav class="nav" aria-label="Workspace">
+      <a href="#studioPanel"><span aria-hidden="true">✦</span>Create from Prompt</a>
+      <a href="#createPanel"><span aria-hidden="true">✂</span>Clip video</a>
+      <a href="#libraryPanel"><span aria-hidden="true">▣</span>My clips</a>
+      <a href="#publishPanel"><span aria-hidden="true">↑</span>Publish</a>
+      <a href="#insightsPanel"><span aria-hidden="true">▥</span>Insights</a>
+      <a href="#workflow"><span aria-hidden="true">◷</span>Activity</a>
+    </nav>
+    <div class="local-pill" role="status"><span id="serverDot" class="pulse off"></span><span id="serverLabel">Connecting locally…</span></div>
+  </aside>
+  <main class="workspace">
+    <header class="page-heading"><h1 id="pageTitle">Create from Prompt</h1><p id="pageDescription">Turn an idea into a narrated vertical video.</p></header>
+    <div class="layout">
+    <div class="stack editor-stack">
+      <section class="card" id="workflow" hidden>
+        <div class="section-head"><div><h2>Full pipeline</h2><p>Track each stage of the current job.</p></div></div>
+        <div id="workflowGrid" class="stage-panel"><div class="empty" style="grid-column:1/-1">Loading stages…</div></div>
+        <p class="hint section-end">Publishing, analytics, and revisions are separate optional stages. A finished export does not mean your video was uploaded.</p>
+      </section>
+
+      <section class="card" id="healthPanel" hidden><div class="section-head"><div><h2>System readiness</h2><p>Checks performed on this device</p></div></div>
+        <div id="systemChecks"><div class="status-row"><span>Checking tools…</span><span class="yellow">…</span></div></div>
+        <p class="hint section-end">Speech recognition and voice-over are optional. You can still export with the original audio.</p>
+      </section>
+      <section class="card" id="studioPanel">
+        <h2>Storyboard</h2>
+        <div class="field"><label for="studioPrompt">Prompt or narration outline</label><textarea id="studioPrompt" maxlength="2400" rows="4" placeholder="Describe your video, or put one narration scene on each line."></textarea></div>
+        <div class="chip-row" style="margin:12px 0"><button class="secondary" id="studioDraft">Draft storyboard</button><button class="outline" id="studioAdd">Add scene</button></div>
+        <p id="studioEngine" class="hint" aria-live="polite"></p>
+        <div class="option-grid studio-settings"><div class="field"><label for="studioTitle">Title</label><input id="studioTitle" maxlength="100"></div>
+        <div class="field"><label for="studioBackground">Background video (optional)</label><select id="studioBackground"><option value="">Text cards</option></select></div></div>
+        <div id="studioScenes"></div>
+        <div class="work-bottom"><button class="primary" id="studioRender">Render video</button></div>
+      </section>
+      <section class="card" id="createPanel" hidden>
+        <h2>Source and export settings</h2>
+        <p class="hint export-note">No YouTube account connection is needed for local exports.</p>
+        
+        <div class="form-grid">
+          <div class="form-fields">
+            <div class="field"><label for="url">YouTube video URL</label><input id="url" type="url" autocomplete="off" placeholder="https://youtube.com/watch?v=…"></div>
+            <div class="label-strip" id="sourcePermissionPanel"><label class="check"><input id="rights" type="checkbox" onchange="rememberSourcePermission()"><span><strong>One-time setup:</strong> I will use ClipBot only with videos I am allowed to download and adapt.</span></label><p id="sourcePermissionNote" style="margin-top:8px">Saved on this browser after you confirm once. You can uncheck it anytime. Permission to publish others’ videos still matters.</p></div>
+            <div class="label-strip"><strong style="font-size:12px">Have a video already?</strong><p>Import a local file instead; YouTube downloading may not be allowed or available for every link.</p><input id="file" type="file" accept="video/*,.mkv,.mov,.webm,.avi" style="margin:9px 0"><button class="secondary" onclick="uploadLocal()" id="uploadLocal" style="width:100%">Import selected file</button><p id="upstatus" style="margin-top:7px"></p></div>
+            <div class="field"><label for="source">Local source file (used when URL is empty)</label><select id="source"><option>Loading…</option></select></div>
+          </div>
+          <div class="form-fields">
+            <div class="option-grid">
+              <div class="field"><label for="countMode">Number of Shorts</label><select id="countMode" onchange="countModeChanged()"><option value="auto" selected>Auto — all usable clips</option><option value="custom">Custom number</option></select><input id="count" class="hidden" type="number" min="1" step="1" value="10" inputmode="numeric" aria-label="Custom clip count"><p class="hint">No five-clip cap. Actual count depends on video length and distinct moments.</p></div>
+              <div class="field"><label for="length">Maximum duration</label><select id="length"><option value="20">20 sec</option><option value="30">30 sec</option><option value="40" selected>40 sec</option><option value="60">60 sec</option></select></div>
+              <div class="field"><label for="width">Export quality</label><select id="width"><option value="480" selected>480 × 854 · faster</option><option value="720">720 × 1280</option></select></div>
+              <div class="field"><label for="voice_mode">Voice-over</label><select id="voice_mode" onchange="voiceChange()"><option value="auto">Automatic intro · offline narration</option><option value="off" selected>Use original audio</option><option value="custom">Custom spoken words</option></select></div>
+            </div>
+            <div class="field hidden" id="voiceCustom"><label for="voice_script">Spoken narration for each clip</label><textarea id="voice_script" maxlength="700" placeholder="Type your script here…"></textarea></div>
+            <label class="check"><input id="captions" type="checkbox" checked><span>Burn subtitles into clips when a transcript is available</span></label>
+            <div class="field"><label for="selection">Highlight selection</label><select id="selection"><option value="classic">Speech and scene cuts</option><option value="gameplay">Gameplay · motion and audio</option></select></div>
+            <div class="field"><label for="framing">Vertical framing</label><select id="framing"><option value="default">Default crop</option><option value="fit">Fit entire frame</option><option value="smart">Smart crop · face or motion</option><option value="center">Fill · center</option><option value="left">Fill · left</option><option value="right">Fill · right</option></select></div>
+            <div class="field"><label for="captionStyle">Caption style</label><select id="captionStyle"><option value="pop" selected>Shorts pop · spoken-word highlight</option><option value="classic">Classic · plain captions</option></select></div>
+            <div class="field"><label for="openingText">Opening text (optional)</label><input id="openingText" maxlength="55" placeholder="What should viewers notice first?"></div>
+            <label class="check"><input id="faceEmoji" type="checkbox" checked><span>Cover detected faces with a smiley</span></label>
+            <details><summary>Upload automation</summary><label class="check"><input id="autoPrivate" type="checkbox"><span>After export, automatically upload each Short to YouTube as <strong>PRIVATE</strong>. Requires connected channel, confirmed rights, and a second confirmation.</span></label><label class="check"><input id="autoDeleteUploaded" type="checkbox"><span>Delete each local MP4 only after YouTube confirms processing.</span></label></details>
+            <p class="hint">Review face coverage before sharing.</p>
+          </div>
+        </div>
+        <div class="work-bottom"><button class="primary" id="generate" onclick="generate()">✦ Generate Shorts</button><span class="hint">Keep ClipBot running while the video processes.</span></div>
+      </section>
+      <section class="card" id="libraryPanel" hidden>
+        <div class="section-head library-summary"><span id="libraryBadge">0 exports</span><span class="hint" id="libraryStorage" aria-live="polite">0 MiB on disk</span></div>
+        <div id="results" class="results"><div class="empty" style="grid-column:1/-1"><span class="big">▣</span><strong>No clips generated yet</strong>Run your first video to see Shorts here.</div></div>
+        
+      </section>
+      <section class="card" id="publishPanel" hidden><div class="section-head"><div><h2>YouTube publishing</h2><p>Upload only after reviewing a finished clip</p></div></div>
+        <div id="account" class="label-strip hint">Checking YouTube authorization…</div>
+        <div class="chip-row" style="margin:12px 0"><button class="secondary" onclick="connectYoutube()">Connect channel</button><button class="ghost" onclick="disconnectYoutube()">Disconnect</button></div>
+        <div class="form-fields">
+          <div class="field"><label for="publishVideo">Clip to publish</label><select id="publishVideo" onchange="loadMeta()"></select></div>
+          <div class="field"><label for="title">YouTube title</label><input id="title" type="text" maxlength="100" placeholder="Your Short title"></div>
+          <div class="field"><label for="description">Description</label><textarea id="description" maxlength="4800"></textarea></div>
+          <div class="field"><label for="privacy">Visibility</label><select id="privacy" onchange="visibilityChanged()"><option value="private">Private · recommended</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></div>
+          <label class="check"><input id="confirmUpload" type="checkbox"><span>I reviewed this Short and have the necessary publishing rights.</span></label>
+          <label class="check"><input id="deleteUploaded" type="checkbox"><span>Delete the local MP4 after YouTube confirms processing.</span></label>
+          <label class="check hidden" id="publicConfirm"><input id="confirmPublic" type="checkbox"><span>I explicitly approve a PUBLIC upload.</span></label>
+          <button class="primary full" onclick="publish()">↑ Upload selected Short</button><div id="published" class="hint"></div>
+        </div>
+        <div class="side-note section-end">You'll authorize your Google account once using official OAuth. No Google password is entered into ClipBot. Uploads default to Private.</div>
+      </section>
+      <section class="card" id="insightsPanel" hidden><div class="section-head"><div><h2>Performance & next test</h2><p>Learn from your own YouTube channel</p></div></div>
+        <div class="field"><label for="myVideo">Your uploaded video</label><select id="myVideo"></select></div>
+        <div class="chip-row" style="margin:12px 0"><button class="secondary" onclick="analyze()">▥ Check performance</button><button class="outline" onclick="suggestVariant()">↻ Try shorter cut</button></div>
+        <div id="insights"><div class="empty"><span class="big">▥</span><strong>No results checked yet</strong>Upload a clip and return when YouTube has data.</div></div>
+        <p class="hint section-end">Insights are experimental suggestions, not guaranteed forecasts. Revisions are saved locally and are never silently republished.</p>
+      </section>
+    </div>
+    <aside class="stack status-stack" aria-label="Processing status">
+      <section class="card" id="progressPanel">
+        <div class="section-head"><div><h2>Processing</h2></div><span id="jobBadge" class="tag">Idle</span></div>
+        <div class="stagebar"><div><div id="stageTitle" class="now">Ready for your first video</div><div id="stageMessage" class="sub">Add a link or upload a file to begin.</div></div><div id="jobPercent" class="pct">0%</div></div>
+        <div class="progress-wrap" role="progressbar" aria-label="Milestone progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progressTrack"><span id="progressFill"></span></div>
+        <div class="status-explainer">Progress shows completed stages. Large batches can take longer.</div>
+        <div class="chip-row" style="margin-top:12px"><span class="chip" id="jobType">No active job</span><span class="chip" id="jobStarted">Not started</span><span class="chip" id="jobMode">AI mode not checked</span></div>
+        <details style="margin-top:15px"><summary>Processing logs</summary><pre class="logbox" id="logs">No processing logs yet.</pre></details>
+      </section>
+
+      <section class="card next-card" aria-label="Suggested action">
+        <a id="nextTitle" href="#createPanel">Import a source video</a>
+        <p id="nextDetail" class="hint">Choose an existing video or create one from a prompt.</p>
+      </section>
+      <section class="card stats-card" aria-label="Workspace totals">
+        <dl class="stat-grid">
+          <div class="stat"><dt>Source videos</dt><dd id="sourceCount" class="num">—</dd></div>
+          <div class="stat"><dt>Local exports</dt><dd id="clipCount" class="num">—</dd></div>
+          <div class="stat"><dt>YouTube uploads</dt><dd id="uploadCount" class="num">—</dd></div>
+          <div class="stat"><dt>Analytics checks</dt><dd id="analyticsCount" class="num">—</dd></div>
+        </dl>
+      </section>
+    </aside>
+  </div>
+</main>
+</div><div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+let lastOutputs='', lastUpload='', lastUploadsCount=-1, lastInputsCount=-1, dashboard=null, toastTimer;
+const workspacePages = {
+  studioPanel: ['Create from Prompt', 'Turn an idea into a narrated vertical video.'],
+  createPanel: ['Clip video', 'Find highlights in a source video and export them as Shorts.'],
+  libraryPanel: ['My clips', 'Preview, save, or delete your local exports.'],
+  publishPanel: ['Publish', 'Review copy and visibility before uploading to YouTube.'],
+  insightsPanel: ['Insights', 'Review performance and try a different cut.'],
+  workflow: ['Activity', 'Check the processing pipeline and local tools.']
+};
+function pageFor(id){
+  return {sourcePermissionPanel:'createPanel',healthPanel:'workflow',progressPanel:'workflow'}[id]||id;
+}
+function showPage(id, scroll=true){
+  const requested=pageFor(id);
+  const page=Object.hasOwn(workspacePages,requested)?requested:'studioPanel';
+  for(const key of Object.keys(workspacePages))$(key).hidden=key!==page;
+  $('healthPanel').hidden=page!=='workflow';
+  for(const link of document.querySelectorAll('.nav a')){
+    if(link.hash==='#'+page)link.setAttribute('aria-current','page');
+    else link.removeAttribute('aria-current');
+  }
+  setText('pageTitle',workspacePages[page][0]);
+  setText('pageDescription',workspacePages[page][1]);
+  if(scroll)window.scrollTo({top:0,behavior:'instant'});
+}
+function jump(id){
+  const page=pageFor(id);
+  if(Object.hasOwn(workspacePages,page)){
+    if(location.hash!=='#'+page)history.pushState(null,'','#'+page);
+    showPage(page);
+  }
+  if(id!==page)$(id)?.scrollIntoView({block:'nearest'});
+}
+window.addEventListener('hashchange',()=>showPage(location.hash.slice(1)));
+
+function toast(s){const el=$('toast');el.textContent=String(s);el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3300)}
+async function fetchJson(url,opts={}){const r=await fetch(url,{cache:'no-store',...opts});let data=await r.json();if(!r.ok)throw Error(data.error||'Request failed');return data}
+function post(url,data){return fetchJson(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})}
+function option(el,value,label){let op=document.createElement('option');op.value=value;op.textContent=label;el.append(op)}
+function rememberSourcePermission(){
+  try{localStorage.setItem('clipbot_source_ack_v1',$('rights').checked?'yes':'no')}catch(e){}
+  updateSourcePermissionUI();
+}
+function updateSourcePermissionUI(){
+  const confirmed=$('rights').checked;
+  $('sourcePermissionNote').textContent=confirmed
+    ? '✓ Saved on this browser. Paste an authorized YouTube link and generate clips without confirming again. Uploading is separate.'
+    : 'Confirm once if your videos are permitted. ClipBot will remember your choice on this browser.';
+  $('sourcePermissionPanel').style.borderColor=confirmed?'#2e7e6b':'#33425d';
+}
+function restoreSourcePermission(){
+  try{$('rights').checked=localStorage.getItem('clipbot_source_ack_v1')==='yes'}catch(e){}
+  updateSourcePermissionUI();
+}
+function countModeChanged(){$('count').classList.toggle('hidden',$('countMode').value!=='custom')}
+function voiceChange(){$('voiceCustom').classList.toggle('hidden',$('voice_mode').value!=='custom')}
+function visibilityChanged(){$('publicConfirm').classList.toggle('hidden',$('privacy').value!=='public')}
+function timeLabel(t){if(!t)return 'Not started';return new Date(t*1000).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}
+async function refreshFiles(){const j=await fetchJson('/api/files');const el=$('source'),v=el.value;el.replaceChildren();option(el,'','Select imported file');for(const f of j.files)option(el,f,f);if(j.files.includes(v))el.value=v;const bg=$('studioBackground'),prior=bg.value;bg.replaceChildren(new Option('Text cards',''));for(const file of j.files)bg.add(new Option(file,file));if(j.files.includes(prior))bg.value=prior;}
+async function uploadLocal(){const file=$('file').files[0];if(!file){toast('Choose a video on your laptop first.');return}const button=$('uploadLocal');button.disabled=true;$('upstatus').textContent='Importing…';try{let res=await fetch('/api/upload',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Filename':encodeURIComponent(file.name)},body:file});const j=await res.json();if(!res.ok)throw Error(j.error||'Import failed');await refreshFiles();$('source').value=j.name;$('url').value='';$('upstatus').textContent='Imported: '+j.name;toast('Video imported successfully');await poll()}catch(e){$('upstatus').textContent='Import failed: '+e.message;toast(e.message)}finally{button.disabled=false}}
+$('selection').addEventListener('change',()=>{if($('framing').value==='default'&&$('selection').value==='gameplay')$('framing').value='fit'});
+
+const studioPlatforms = {
+  'YouTube Shorts': 'https://studio.youtube.com/',
+  'Instagram Reels': 'https://www.instagram.com/',
+  'TikTok': 'https://www.tiktok.com/upload',
+  'Facebook Reels': 'https://www.facebook.com/',
+  'X': 'https://x.com/compose/post'
+};
+function studioScene(heading='', narration=''){
+  const list=$('studioScenes');
+  if(list.children.length>=8)return toast('Use at most eight scenes.');
+  const field=document.createElement('fieldset');
+  const title=document.createElement('input');
+  title.maxLength=55;title.value=heading;title.placeholder='Scene heading';
+  title.setAttribute('aria-label','Scene heading');
+  const words=document.createElement('textarea');
+  words.maxLength=500;words.rows=3;words.value=narration;words.placeholder='What should the narrator say?';
+  words.setAttribute('aria-label','Scene narration');
+  const remove=document.createElement('button');
+  remove.textContent='Remove scene';remove.className='outline';remove.onclick=()=>field.remove();
+  field.append(title,words,remove);list.append(field);
+}
+$('studioAdd').onclick=()=>studioScene();
+$('studioDraft').onclick=async()=>{
+  const button=$('studioDraft');button.disabled=true;
+  setText('studioEngine','Drafting storyboard…');
+  try{
+    const draft=await post('/api/studio/draft',{prompt:$('studioPrompt').value.trim()});
+    $('studioTitle').value=draft.title;
+    $('studioScenes').replaceChildren();
+    for(const scene of draft.scenes)studioScene(scene.heading,scene.narration);
+    setText('studioEngine',draft.engine!=='Offline storyboard template'?
+      'Drafted by '+draft.engine+'. Review the script before rendering.':
+      'Offline template. Turn your outline into narration and fill any empty scenes before rendering.');
+  }catch(error){setText('studioEngine',error.message)}
+  finally{button.disabled=false}
+};
+$('studioRender').onclick=async()=>{
+  const button=$('studioRender');button.disabled=true;
+  const scenes=[...$('studioScenes').children].map(field=>({
+    heading:field.querySelector('input').value,narration:field.querySelector('textarea').value
+  }));
+  try{
+    await post('/api/studio/render',{title:$('studioTitle').value,scenes,source:$('studioBackground').value});
+    toast('Rendering started. Your video will appear in My clips.');jump('progressPanel');await poll();
+  }catch(error){toast(error.message)}
+  finally{button.disabled=false}
+};
+function studioShare(clip){
+  const posts=clip.studio_posts;
+  const panel=document.createElement('details');
+  const summary=document.createElement('summary');summary.textContent='Post to other platforms';
+  const platform=document.createElement('select');platform.setAttribute('aria-label','Destination');
+  for(const name of Object.keys(posts)){const option=document.createElement('option');option.value=option.textContent=name;platform.append(option)}
+  const caption=document.createElement('textarea');caption.rows=4;caption.setAttribute('aria-label','Post caption');
+  const open=document.createElement('a');open.className='secondary';open.target='_blank';open.rel='noopener noreferrer';
+  const refresh=()=>{caption.value=posts[platform.value];open.textContent='Open '+platform.value;open.href=studioPlatforms[platform.value]};
+  platform.onchange=refresh;refresh();
+  const copy=document.createElement('button');copy.className='outline';copy.textContent='Copy caption';
+  copy.onclick=async()=>{try{await navigator.clipboard.writeText(caption.value);toast('Caption copied.')}catch{caption.focus();caption.select();toast('Use Ctrl+C to copy the selected caption.')}};
+  const help=document.createElement('p');help.className='hint';help.textContent='Save the MP4, then use this caption when uploading on the destination.';
+  panel.append(summary,platform,caption,copy,open,help);
+  if(dashboard?.capabilities.postiz_configured){
+    const load=document.createElement('button');load.className='outline';load.textContent='Load Postiz accounts';
+    const accounts=document.createElement('div');
+    load.onclick=async()=>{
+      load.disabled=true;
+      try{
+        const reply=await fetchJson('/api/postiz/channels');
+        accounts.replaceChildren();
+        const mapping={youtube:'YouTube Shorts',instagram:'Instagram Reels','instagram-standalone':'Instagram Reels',tiktok:'TikTok',facebook:'Facebook Reels',x:'X'};
+        const editors=[];
+        for(const destination of reply.channels){
+          const label=document.createElement('label');
+          const checked=document.createElement('input');checked.type='checkbox';
+          label.append(checked,document.createTextNode(destination.name+' ('+destination.platform+')'));
+          const text=document.createElement('textarea');text.maxLength=4800;
+          text.value=(posts[mapping[destination.platform]]||clip.title).slice(0,4800);text.rows=2;
+          text.setAttribute('aria-label','Caption for '+destination.name);
+          editors.push({destination,checked,text});accounts.append(label,text);
+        }
+        if(!editors.length){accounts.textContent='No compatible accounts are connected in Postiz.';return}
+        const save=document.createElement('button');save.className='secondary';save.textContent='Send selected drafts to Postiz';
+        save.onclick=async()=>{
+          const selected=editors.filter(item=>item.checked.checked);
+          if(!selected.length)return toast('Select at least one destination.');
+          if(!confirm('Send this video and the selected captions to Postiz as drafts for '+selected.map(item=>item.destination.name).join(', ')+'?'))return;
+          save.disabled=true;
+          try{
+            const selections=Object.fromEntries(selected.map(item=>[item.destination.id,item.text.value]));
+            const result=await post('/api/postiz/drafts',{name:clip.name,title:clip.title,selections,confirm:true});
+            toast(result.drafts.length+' draft(s) saved in Postiz. Review and schedule them there.');
+          }catch(error){toast(error.message)}
+          finally{save.disabled=false}
+        };
+        accounts.append(save);
+      }catch(error){toast(error.message)}
+      finally{load.disabled=false}
+    };
+    panel.append(load,accounts);
+  }
+  return panel;
+}
+
+async function generate(){const url=$('url').value.trim(),name=$('source').value;if(!url&&!name)return toast('Add a YouTube URL or import a local video first.');if(url&&!$('rights').checked){jump('sourcePermissionPanel');return toast('One-time setup: confirm you will only use permitted videos. ClipBot remembers your choice.');}const options={name,url,rights_confirmed:$('rights').checked,count:$('countMode').value==='auto'?0:Number($('count').value),length:+$('length').value,width:+$('width').value,captions:$('captions').checked,selection:$('selection').value,framing:$('framing').value,caption_style:$('captionStyle').value,opening_text:$('openingText').value,face_emoji:$('faceEmoji').checked,voice_mode:$('voice_mode').value,voice_script:$('voice_script').value,auto_private_upload:$('autoPrivate').checked,delete_after_upload:$('autoPrivate').checked&&$('autoDeleteUploaded').checked};if(!Number.isSafeInteger(options.count)||($('countMode').value==='custom'&&options.count<1))return toast('Enter a positive whole-number clip count.');if(options.auto_private_upload&&!options.rights_confirmed)return toast('Confirm publishing rights for automatic private uploads.');if(options.auto_private_upload&&!confirm('After editing, upload every Short as a PRIVATE draft to your connected YouTube channel?'+(options.delete_after_upload?' Local MP4s will be permanently deleted after YouTube confirms processing.':'')))return;try{await post('/api/start',options);toast('Generation started. Follow progress above.');jump('progressPanel');await poll()}catch(e){toast(e.message)}}
+function buildWorkflow(steps){const grid=$('workflowGrid');grid.replaceChildren();steps.forEach((x,i)=>{const card=document.createElement('div');card.className='stage '+x.status;const top=document.createElement('div');top.className='stage-top';const no=document.createElement('span');no.className='step-no';no.textContent=String(i+1).padStart(2,'0');const status=document.createElement('span');status.className='stage-state';const statusNames={done:'✓ Done',active:'● Running',waiting:'Waiting',optional:'Optional',skipped:'Skipped',error:'! Error'};status.textContent=statusNames[x.status]||x.status;top.append(no,status);const title=document.createElement('h3');title.textContent=x.title;const desc=document.createElement('p');desc.textContent=x.detail;card.append(top,title,desc);grid.append(card)})}
+function buildHealth(c){const el=$('systemChecks');el.replaceChildren();const list=[['FFmpeg editor','ffmpeg',true],['Offline speech · Whisper','whisper',false],['Offline narration','voice',false],['YouTube link importer','downloader',false],['Channel authorization','youtube_connected',false]];for(const [label,key,required] of list){const row=document.createElement('div');row.className='status-row';const a=document.createElement('span');a.textContent=label;const b=document.createElement('span');b.className=c[key]?'green':required?'red':'yellow';b.textContent=c[key]?'✓ Ready':required?'✕ Missing':'○ Not set up';row.append(a,b);el.append(row)}}
+let libraryPage = 0;
+const libraryPageSize = 24;
+function buildLibrary(outputs, pageOnly=false){const el=$('results');el.replaceChildren();const pub=$('publishVideo'),previous=pub.value;if(!pageOnly)pub.replaceChildren();if(!outputs.length){const div=document.createElement('div');div.className='empty';div.style.gridColumn='1/-1';div.innerHTML='<span class="big">▣</span><strong>No clips generated yet</strong>Generate Shorts and they will appear here.';el.append(div);option(pub,'','No clips available');$('title').value='';$('description').value='';return}const pages = Math.ceil(outputs.length/libraryPageSize);
+libraryPage = Math.min(libraryPage, pages-1);
+if(!pageOnly)for(const f of outputs)option(pub,f.name,f.name);
+for(const f of outputs.slice(libraryPage*libraryPageSize,(libraryPage+1)*libraryPageSize)){const card=document.createElement('article');card.className='clip';const video=document.createElement('video');video.controls=true;video.preload='none';video.playsInline=true;video.src='/api/preview?name='+encodeURIComponent(f.name);video.setAttribute('aria-label','Preview '+f.name);const info=document.createElement('div');info.className='clipinfo';const name=document.createElement('strong');name.textContent=f.title;const meta=document.createElement('div');meta.className='meta';meta.textContent=[f.size_mb+' MB',f.has_captions?'Captions':'No captions',f.variant?'Revision':'Original'].join(' · ');const actions=document.createElement('div');actions.className='clip-actions';const a=document.createElement('a');a.className='secondary';a.href='/api/download?name='+encodeURIComponent(f.name);a.download=f.name;a.textContent='↓ Save MP4';const button=document.createElement('button');button.className='outline';button.textContent='↑ Prepare upload';button.onclick=()=>{$('publishVideo').value=f.name;loadMeta();jump('publishPanel');toast('Review this clip and its metadata before uploading.');};const remove=document.createElement('button');remove.className='outline';remove.textContent='Delete local MP4';remove.onclick=async()=>{if(!confirm('Permanently delete the local MP4 for "'+f.title+'"? '+(f.has_upload_record?'Your YouTube upload record will be kept.':'There is no YouTube upload recorded for this file.')))return;remove.disabled=true;video.pause();video.removeAttribute('src');video.load();try{const result=await post('/api/exports/delete',{name:f.name,confirm:true});toast('Deleted local MP4. Freed '+(result.freed_bytes/1048576).toFixed(2)+' MiB.');await poll()}catch(error){toast(error.message);video.src='/api/preview?name='+encodeURIComponent(f.name);remove.disabled=false}};actions.append(a,button,remove);info.append(name,meta);if(f.reason){const reason=document.createElement('div');reason.className='meta';reason.textContent=f.reason+' · '+Math.floor(f.source_start)+'–'+Math.ceil(f.source_end)+'s in source';info.append(reason)}info.append(actions);if(f.studio_posts)info.append(studioShare(f));card.append(video,info);el.append(card)}if(!pageOnly){
+  pub.value=outputs.some(f=>f.name===previous)?previous:outputs[0].name;
+  if(pub.value!==previous)loadMeta();
+}
+if(pages>1){
+  const nav=document.createElement('div');
+  nav.className='hero-actions';
+  nav.style.gridColumn='1/-1';
+  const makeButton=(label,delta,disabled)=>{
+    const button=document.createElement('button');
+    button.className='outline';
+    button.textContent=label;
+    button.disabled=disabled;
+    button.onclick=()=>{libraryPage+=delta;buildLibrary(outputs,true)};
+    return button;
+  };
+  const label=document.createElement('span');
+  label.textContent='Page '+(libraryPage+1)+' of '+pages;
+  nav.append(makeButton('Previous',-1,libraryPage===0),label,makeButton('Next',1,libraryPage===pages-1));
+  el.append(nav);
+}}
+function setText(id,value){$(id).textContent=String(value)}
+function updateDashboard(d){dashboard=d;const j=d.job;setText('sourceCount',d.source_count);setText('clipCount',d.output_count);setText('uploadCount',d.upload_count);setText('analyticsCount',d.analytics_count);$('serverDot').classList.remove('off');setText('serverLabel','Running on this laptop');const error=!!j.error&&!j.busy;setText('jobBadge',j.busy?'● Processing':error?'! Action needed':d.output_count?'✓ Ready':'○ Waiting');$('jobBadge').className='tag'+(error?' bad':j.busy?' warn':d.output_count?' good':'');setText('stageTitle',error?'Processing stopped: '+j.stage:j.busy?j.stage:j.finished_at?j.stage:d.output_count?'Clips available to review':'Ready for your first video');setText('stageMessage',j.error?'Error: '+j.error:(j.busy||j.finished_at)?j.message:d.output_count?'Open the library below to review exports.':'Add a YouTube link or import your own video to start.');const percent=+j.progress||0;setText('jobPercent',j.job?percent+'%':'—');$('progressFill').style.width=(j.job?percent:0)+'%';$('progressTrack').setAttribute('aria-valuenow',percent);setText('jobType',j.job_kind?('Job: '+j.job_kind):'No active job');setText('jobStarted',j.started_at?'Started '+timeLabel(j.started_at):'Not started');setText('jobMode',j.mode||'Clip selection not yet performed');setText('logs',(j.logs||[]).length?j.logs.join('\n'):'No processing logs yet.');$('generate').disabled=!!j.busy;buildWorkflow(d.workflow);buildHealth(d.capabilities);if(d.next_action){const next=$('nextTitle');next.href='#'+pageFor(d.next_action.target);next.textContent=d.next_action.title;setText('nextDetail',d.next_action.detail);}setText('libraryBadge',d.output_count+' exports');setText('libraryStorage',((d.local_export_bytes||0)/1048576).toFixed(1)+' MiB of local MP4s');let key=d.outputs.map(x=>[x.name,x.size_mb,x.title,x.has_upload_record].join('|')).join(';');if(key!==lastOutputs){lastOutputs=key;buildLibrary(d.outputs)}if(d.source_count!==lastInputsCount){lastInputsCount=d.source_count;refreshFiles().catch(()=>{})}if(d.upload_count!==lastUploadsCount){lastUploadsCount=d.upload_count;refreshAccount().catch(()=>{})}if(j.last_upload && j.last_upload.id!==lastUpload){lastUpload=j.last_upload.id;setText('published','Uploaded '+j.last_upload.privacy+': '+j.last_upload.url+(j.last_upload.cleanup?' · '+j.last_upload.cleanup:''));refreshAccount().catch(()=>{});toast('YouTube upload completed.')}}
+async function poll(){try{const d=await fetchJson('/api/dashboard');updateDashboard(d)}catch(e){$('serverDot').classList.add('off');setText('serverLabel','Server unavailable');setText('stageMessage','Local server unavailable. Start ClipBot using START_CLIPBOT.bat.');}}
+async function loadMeta(){const name=$('publishVideo').value;if(!name)return;try{const j=await fetchJson('/api/metadata?name='+encodeURIComponent(name));$('title').value=j.title||'';$('description').value=j.description||''}catch(e){$('title').value='Short highlight #Shorts';$('description').value='Edited highlight #Shorts'}}
+async function refreshAccount(){try{const j=await fetchJson('/api/youtube/status');$('account').textContent=j.connected?'✓ YouTube account connected — ready for approved uploads':j.oauth_configured?'Credentials configured. Tap Connect channel to authorize.':'Not connected. See README for one-time Google Cloud OAuth setup.';const select=$('myVideo'),prev=select.value;select.replaceChildren();option(select,'','Choose uploaded video');for(const [id,item] of Object.entries(j.uploads||{}))option(select,id,item.title+' · '+id);if(j.uploads&&j.uploads[prev])select.value=prev}catch(e){$('account').textContent=e.message}}
+async function connectYoutube(){try{const j=await fetchJson('/api/youtube/oauth-start');window.location.href=j.url}catch(e){toast(e.message+' · See README for Google setup')}}
+async function disconnectYoutube(){if(!confirm('Disconnect your Google account from ClipBot on this computer?'))return;try{await post('/api/youtube/disconnect',{});await refreshAccount();toast('Account disconnected locally.')}catch(e){toast(e.message)}}
+async function publish(){const name=$('publishVideo').value;if(!name)return toast('Generate and select an MP4 first.');if(!$('confirmUpload').checked)return toast('Review the clip and confirm publishing rights first.');const privacy=$('privacy').value;if(privacy==='public'&&!$('confirmPublic').checked)return toast('Explicit approval required for PUBLIC upload.');const delete_after_upload=$('deleteUploaded').checked;if(!confirm('Upload '+name+' to your own channel as '+privacy+'?'+(delete_after_upload?' Permanently delete the local MP4 after YouTube confirms processing.':'')))return;try{await post('/api/youtube/upload',{name,privacy,title:$('title').value,description:$('description').value,delete_after_upload,confirm:true,publish_public:privacy==='public'&&$('confirmPublic').checked});setText('published','Uploading… monitor the processing activity.');toast('Upload started');jump('progressPanel');await poll()}catch(e){toast(e.message)}}
+async function analyze(){const id=$('myVideo').value;if(!id)return toast('Select a video previously uploaded through ClipBot.');$('insights').textContent='Checking authorized YouTube analytics…';try{const j=await post('/api/youtube/analyze',{video_id:id});const container=$('insights');container.replaceChildren();const grid=document.createElement('div');grid.className='analytics-grid';for(const [name,value] of [['Views',j.views],['Avg viewed',j.average_view_percentage+'%'],['Avg duration',j.average_view_duration_seconds+'s'],['Watch minutes',j.watch_minutes],['Likes',j.likes],['Comments',j.comments]]){let box=document.createElement('div');box.className='metric';let b=document.createElement('b');b.textContent=String(value);let small=document.createElement('small');small.textContent=name;box.append(b,small);grid.append(box)}const advice=document.createElement('div');advice.className='insight-advice';advice.textContent='NEXT EXPERIMENT: '+j.advice;const note=document.createElement('p');note.className='hint';note.textContent=j.data_note+' · Reporting: '+j.start+' to '+j.end;container.append(grid,advice,note);if(j.comparison){const comparison=document.createElement('p');comparison.textContent=j.comparison;container.append(comparison)}toast('Analytics updated');await poll()}catch(e){$('insights').textContent='Analytics unavailable: '+e.message}}
+async function suggestVariant(){const id=$('myVideo').value;if(!id)return toast('Select a ClipBot upload first.');if(!confirm('Generate a local alternative using the latest performance report?'))return;try{await post('/api/youtube/revise',{video_id:id});toast('Revision started. See live workflow.');jump('progressPanel');await poll()}catch(e){toast(e.message)}}
+showPage(location.hash.slice(1),false);restoreSourcePermission();countModeChanged();voiceChange();visibilityChanged();refreshFiles().catch(()=>{});refreshAccount().catch(()=>{});poll();setInterval(()=>{if(!document.hidden)poll()},2500);document.addEventListener('visibilitychange',()=>{if(!document.hidden){poll();refreshAccount().catch(()=>{})}});
+</script>
+</body></html>

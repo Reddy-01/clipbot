@@ -1,0 +1,13 @@
+{$CLIPBOT_DOMAIN} {
+    basic_auth {
+        {$CLIPBOT_USERNAME} {$CLIPBOT_PASSWORD_HASH}
+    }
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+    }
+    reverse_proxy clipbot:8765 {
+        header_up -Authorization
+    }
+}

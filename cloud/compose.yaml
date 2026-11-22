@@ -1,0 +1,32 @@
+services:
+  clipbot:
+    build:
+      context: ..
+      dockerfile: cloud/Dockerfile
+    restart: unless-stopped
+    environment:
+      CLIPBOT_PUBLIC_ORIGIN: "https://${CLIPBOT_DOMAIN:?Set CLIPBOT_DOMAIN in .env}"
+      CLIPBOT_POSTIZ_URL: "${CLIPBOT_POSTIZ_URL:-}"
+      CLIPBOT_POSTIZ_KEY: "${CLIPBOT_POSTIZ_KEY:-}"
+    volumes:
+      - clipbot_data:/data
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - clipbot
+    environment:
+      CLIPBOT_DOMAIN: "${CLIPBOT_DOMAIN:?Set CLIPBOT_DOMAIN in .env}"
+      CLIPBOT_USERNAME: "${CLIPBOT_USERNAME:?Set CLIPBOT_USERNAME in .env}"
+      CLIPBOT_PASSWORD_HASH: "${CLIPBOT_PASSWORD_HASH:?Set CLIPBOT_PASSWORD_HASH in .env}"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+volumes:
+  clipbot_data:
+  caddy_data:
+  caddy_config:
