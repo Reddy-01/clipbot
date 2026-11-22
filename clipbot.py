@@ -1190,7 +1190,13 @@ class Handler(BaseHTTPRequestHandler):
         external = public_origin()
         port = getattr(getattr(self, "server", None), "server_port", 8765)
         allowed = (external,) if external else (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
-        if (external or origin) and origin not in allowed:
+        codespaces_same_origin = (
+            external and os.environ.get("CODESPACES") == "true"
+            and self.client_address[0] == "127.0.0.1"
+            and self.headers.get("Sec-Fetch-Site") == "same-origin"
+            and origin in (None, f"http://127.0.0.1:{port}", f"http://localhost:{port}")
+        )
+        if (external or origin) and origin not in allowed and not codespaces_same_origin:
             return self.fail(403, "Foreign origin not allowed")
         if self.path == "/api/exports/delete":
             try:
