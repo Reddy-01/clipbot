@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
-cd "${CLIPBOT_TOOLS:?}"
+mkdir -p "${CLIPBOT_TOOLS:?}"
+cd "$CLIPBOT_TOOLS"
 download() {
     mkdir -p "$(dirname "$1")"
     curl --fail --silent --show-error --location --retry 3 "$2" -o "$1"
@@ -14,3 +15,4 @@ done
 download "face_detection_yunet_2023mar.onnx" "https://media.githubusercontent.com/media/opencv/opencv_zoo/48b10fa505aeb51fbd127fc60a5c660040e823b7/models/face_detection_yunet/face_detection_yunet_2023mar.onnx"
 download "llama/qwen2.5-0.5b-instruct-q4_k_m.gguf" "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/9217f5db79a29953eb74d5343926648285ec7e67/qwen2.5-0.5b-instruct-q4_k_m.gguf"
 sha256sum -c /tmp/clipbot/models.sha256
+
