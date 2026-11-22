@@ -717,7 +717,7 @@ def start_studio(data):
                 exports.mkdir()
                 duration = creator_studio.render(title, scenes, folder, exports / filename,
                     source=source, run=run, narrate=narrate, transcribe=transcribe, segment=Segment,
-                    progress=lambda n, count: update("Rendering storyboard", 10 + 85 * n // count,
+                    progress=lambda n, count: update("Rendering storyboard", 10 + 85 * n // count,, info.st_ctime_ns
                                                       f"Narrating and rendering scene {n+1} of {count}"))
                 description = "\n".join(scene["narration"] for scene in scenes)
                 posts = {"YouTube Shorts": title + "\n\n" + description,
