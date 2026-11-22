@@ -1,5 +1,7 @@
 #!/bin/sh
 set -eu
+mkdir -p "$CLIPBOT_TOOLS"
+mkdir -p "${CLIPBOT_TOOLS:?}"
 cd "${CLIPBOT_TOOLS:?}"
 download() {
     mkdir -p "$(dirname "$1")"
