@@ -1047,7 +1047,14 @@ class Handler(BaseHTTPRequestHandler):
         if not super().parse_request():
             return False
         external = public_origin()
-        if external and self.headers.get("Host") != urlsplit(external).netloc:
+        host = self.headers.get("Host", "")
+        local_proxy = (
+            os.environ.get("CODESPACES") == "true"
+            and self.client_address[0] == "127.0.0.1"
+            and host in {"localhost", "127.0.0.1", f"localhost:{self.server.server_port}",
+                         f"127.0.0.1:{self.server.server_port}"}
+        )
+        if external and host != urlsplit(external).netloc and not local_proxy:
             self.fail(403, "Unexpected request hostname")
             return False
         return True

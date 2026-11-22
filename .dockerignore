@@ -1,0 +1,4 @@
+.git
+.clipbot-data
+cloud/.env
+__pycache__
