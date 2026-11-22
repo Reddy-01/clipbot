@@ -4,6 +4,13 @@
     "dockerfile": "cloud/Dockerfile",
     "context": "."
   },
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "username": "vscode"
+    }
+  },
+  "remoteUser": "vscode",
+  "containerUser": "vscode",
   "overrideCommand": true,
   "forwardPorts": [
     8765
